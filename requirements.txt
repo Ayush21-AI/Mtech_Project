@@ -1,0 +1,8 @@
+# Core dependencies for CIFAR-10 EDA
+numpy>=1.21
+pandas>=1.3
+matplotlib>=3.5
+
+# Development / notebook
+jupyter>=1.0
+pytest>=7.0
