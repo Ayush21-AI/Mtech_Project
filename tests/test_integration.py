@@ -24,7 +24,10 @@ def test_default_config_runs_two_epochs() -> None:
     config.data.fast_dev_run = True
     config.data.fast_dev_size = 500
     config.data.num_workers = 0
-    config.data.pin_memory = False
+    # Keep pin_memory=True (the default): this is the exact path that previously
+    # crashed with a NameError inside get_dataloaders, so the regression test
+    # must actually exercise it rather than short-circuiting around it.
+    config.data.pin_memory = True
     config.epochs = 2
     config.use_amp = False
     config.compile_model = False

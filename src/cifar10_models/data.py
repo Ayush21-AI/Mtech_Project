@@ -164,22 +164,12 @@ def get_dataloaders(
         world_size=world_size,
         seed=data_cfg.seed,
     )
-    val_sampler = get_distributed_sampler(
-        val_subset,
-        shuffle=False,
-        distributed=distributed,
-        rank=rank,
-        world_size=world_size,
-        seed=data_cfg.seed,
-    )
-    test_sampler = get_distributed_sampler(
-        test_subset,
-        shuffle=False,
-        distributed=distributed,
-        rank=rank,
-        world_size=world_size,
-        seed=data_cfg.seed,
-    )
+    # Validation/test are intentionally NOT sharded across DDP ranks: each rank
+    # evaluates the full set so the metrics that drive checkpointing and early
+    # stopping (and the final reported accuracy) are computed over every sample,
+    # not a 1/world_size slice. Only training is data-parallel.
+    val_sampler = None
+    test_sampler = None
 
     # Disable CutMix/Mixup for tiny fast-dev subsets to keep smoke tests stable.
     use_cutmix_mixup = (

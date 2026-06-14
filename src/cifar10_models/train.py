@@ -97,7 +97,7 @@ def fit(
     val_loader: DataLoader,
     config: TrainConfig,
     callbacks: list[Callback] | None = None,
-) -> dict[str, list[float]]:
+) -> tuple[dict[str, list[float]], nn.Module]:
     """Train a CIFAR-10 model with production features.
 
     Parameters
@@ -115,8 +115,9 @@ def fit(
 
     Returns
     -------
-    dict[str, list[float]]
-        Training history.
+    tuple[dict[str, list[float]], nn.Module]
+        The training history and the model to use for evaluation/export
+        (the EMA model when EMA is enabled, otherwise the trained model).
     """
     device = config.device
     raw_model = model.to(device)
@@ -126,7 +127,13 @@ def fit(
 
     if is_distributed():
         from torch.nn.parallel import DistributedDataParallel as DDP
-        model = DDP(raw_model, device_ids=[device])
+
+        # device_ids is only valid for single-CUDA-device processes; it must
+        # be None for CPU/MPS, otherwise DDP raises at construction time.
+        if device.type == "cuda":
+            model = DDP(raw_model, device_ids=[device.index])
+        else:
+            model = DDP(raw_model)
     else:
         model = raw_model
 

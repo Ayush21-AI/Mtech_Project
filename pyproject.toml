@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "cifar10-eda"
 version = "0.2.0"
 description = "Production-grade EDA and PyTorch modeling for CIFAR-10."
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.21",
     "pandas>=1.3",

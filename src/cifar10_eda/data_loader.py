@@ -107,7 +107,12 @@ def extract_archive(
     logger.info("Extracting %s to %s", archive_path, extract_to)
     extract_to.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive_path, "r:gz") as tar:
-        tar.extractall(path=extract_to)
+        # The ``data`` filter (Python 3.12+) blocks path-traversal / unsafe
+        # members. Fall back gracefully on older interpreters that lack it.
+        try:
+            tar.extractall(path=extract_to, filter="data")
+        except TypeError:
+            tar.extractall(path=extract_to)
     logger.info("Extraction complete")
 
     if not _is_extracted(extracted_dir):
