@@ -1,63 +1,34 @@
-# CIFAR-10 EDA & Production Modeling
+# CIFAR-10 Image Classifier
 
-A production-grade CIFAR-10 research project with a unique focus: **comparing patch-based architectures** (PatchCNN, ConvMixer, ViT) against a strong CNN baseline (ResNet-18), all trained with modern production recipes on the local CIFAR-10 archive.
+A clean PyTorch project that trains and compares different image classification models on the CIFAR-10 dataset.
 
-This is **not** a generic ResNet training repo. It is designed as a lightweight, transparent, plain-PyTorch testbed for studying how different patch-based inductive biases perform on small-scale image classification.
+## What this project does
 
-## What makes this project unique
+- Loads CIFAR-10 images from a local `cifar-10-python.tar.gz` file.
+- Trains one of four models: **ConvMixer**, **Patch CNN**, **Vision Transformer**, or **ResNet-18**.
+- Uses modern training tricks: AdamW, warmup + cosine LR, data augmentation (RandAugment, CutMix, Mixup), AMP, EMA, early stopping, and checkpointing.
+- Evaluates the trained model on the test set.
+- Optionally exports the trained model to ONNX format for deployment.
+- Keeps everything modular and config-driven.
 
-- **Patch-architecture comparison**: Patch-based CNN, ConvMixer, Vision Transformer (with optional CNN stem + stochastic depth), and ResNet-18 in one factory.
-- **Config-driven training**: YAML configs + CLI overrides, no heavy framework required.
-- **Modern training recipe**: AdamW, warmup + cosine LR, gradient clipping, AMP, `torch.compile` support, EMA, early stopping, best checkpointing.
-- **Modern augmentation**: RandAugment, CutMix, Mixup, RandomErasing, label smoothing.
-- **Production tooling**: torchmetrics, MLflow / W&B logging, ONNX export + runtime parity check, DDP-ready launcher, test-time augmentation.
-- **Pure plain PyTorch**: no Lightning, no Hydra, no timm — full control and minimal dependencies.
-
-## Structure
+## Project structure
 
 ```
 Mtech_Project/
-├── configs/
-│   ├── default.yaml              # ConvMixer default recipe
+├── configs/                    # YAML training configs
+│   ├── default.yaml            # ConvMixer config
 │   ├── patch_cnn.yaml
 │   ├── vit.yaml
-│   ├── resnet18.yaml
-│   └── ...
+│   └── resnet18.yaml
 ├── notebooks/
-│   ├── CIFAR_EDA.ipynb           # Thin EDA orchestrator
-│   └── CIFAR_Models.ipynb        # Thin training / export orchestrator
+│   ├── CIFAR_EDA.ipynb         # EDA notebook
+│   └── CIFAR_Models.ipynb      # Training notebook
 ├── src/
-│   ├── cifar10_eda/              # EDA package (unchanged)
-│   └── cifar10_models/           # PyTorch modeling package
-│       ├── __init__.py
-│       ├── __main__.py           # python -m cifar10_models
-│       ├── cli.py                # argparse CLI
-│       ├── config.py             # dataclass-driven config
-│       ├── data.py               # DataLoader + train/val split + DDP sampler
-│       ├── augmentation.py       # RandAugment, CutMix, Mixup
-│       ├── train.py              # Production training loop
-│       ├── evaluate.py           # Evaluation + TTA
-│       ├── metrics.py            # torchmetrics + simple tracker
-│       ├── optim.py              # optimizer/scheduler/EMA/AMP
-│       ├── export.py             # ONNX export + parity check
-│       ├── distributed.py        # DDP helpers
-│       ├── callbacks.py          # checkpointing, early stopping, loggers
-│       ├── utils.py              # seed, YAML loading
-│       └── models/
-│           ├── __init__.py
-│           ├── model_factory.py  # build_model(name, config)
-│           ├── patch_cnn.py      # Patch-based CNN
-│           ├── convmixer.py      # ConvMixer (strong patch-CNN baseline)
-│           ├── vit.py            # Vision Transformer
-│           └── resnet.py         # CIFAR-10 ResNet-18
-├── tests/
-│   ├── test_data_loader.py       # EDA data sanity
-│   ├── test_models.py            # All model forward + train step
-│   ├── test_config.py            # Config loading/validation
-│   ├── test_export.py            # ONNX parity for every model
-│   └── test_training.py          # One-epoch fast-dev run
-├── pyproject.toml                # Dependencies + CLI entry point
-└── README.md                     # This file
+│   ├── cifar10_eda/            # EDA package
+│   └── cifar10_models/         # PyTorch training package
+├── tests/                      # Pytest tests
+├── pyproject.toml              # Dependencies
+└── README.md                   # This file
 ```
 
 ## Setup
@@ -68,110 +39,104 @@ Mtech_Project/
    source .venv/bin/activate
    ```
 
-2. Install dependencies in editable mode:
+2. Install dependencies:
    ```bash
    pip install -e ".[dev]"
    ```
 
-3. Place the CIFAR-10 archive at the project root:
+3. Put the CIFAR-10 archive in the project root:
    ```
    Mtech_Project/cifar-10-python.tar.gz
    ```
-   If it is missing, the notebooks / CLI will raise a clear `FileNotFoundError`.
+   If you don't have it, download it from https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
 
-## Running the EDA
+## How to run
+
+### 1. Run tests to check everything works
 
 ```bash
-jupyter notebook notebooks/CIFAR_EDA.ipynb
+pytest
 ```
 
-## Training from the command line
+You should see all tests pass.
 
-Train the default ConvMixer recipe:
+### 2. Train a model from the command line
 
 ```bash
 python -m cifar10_models --config configs/default.yaml
 ```
 
-Override any config field from the CLI:
+This trains ConvMixer on the full CIFAR-10 dataset for 50 epochs and saves the best checkpoint to `checkpoints/`.
+
+To train a different model:
 
 ```bash
-python -m cifar10_models \
-  --config configs/vit.yaml \
-  --override model.use_cnn_stem=true \
-  --override epochs=10 \
-  --override data.batch_size=64
+python -m cifar10_models --config configs/vit.yaml
 ```
 
-Fast dev run (small subset, useful for debugging):
+### 3. Quick smoke test (fast training on a small subset)
 
 ```bash
 python -m cifar10_models \
   --config configs/default.yaml \
   --override data.fast_dev_run=true \
   --override data.fast_dev_size=500 \
-  --override epochs=2
-```
-
-Export to ONNX and evaluate with test-time augmentation:
-
-```bash
-python -m cifar10_models \
-  --config configs/default.yaml \
+  --override epochs=1 \
   --export-onnx \
   --test-tta
 ```
 
-## Training from the notebook
+This:
+- Trains on only 500 images for 1 epoch.
+- Evaluates on the test set.
+- Runs test-time augmentation.
+- Exports the model to `checkpoints/convmixer.onnx`.
+
+### 4. Train in Jupyter notebook
 
 ```bash
 jupyter notebook notebooks/CIFAR_Models.ipynb
 ```
 
-The notebook loads a config, builds the model, trains, evaluates, optionally runs TTA, and exports to ONNX.
-
-## Distributed training
-
-Launch with `torchrun` on a multi-GPU machine:
-
-```bash
-torchrun --nproc_per_node=2 -m cifar10_models \
-  --config configs/default.yaml \
-  --distributed \
-  --override data.batch_size=256
-```
-
-## Experiment tracking
-
-Enable MLflow or W&B via config overrides:
+### 5. Override any config from the command line
 
 ```bash
 python -m cifar10_models \
   --config configs/default.yaml \
-  --override logging.use_mlflow=true \
-  --override logging.experiment_name=cifar10-convmixer
+  --override epochs=10 \
+  --override data.batch_size=64
 ```
 
-```bash
-python -m cifar10_models \
-  --config configs/default.yaml \
-  --override logging.use_wandb=true \
-  --override logging.experiment_name=cifar10-convmixer
-```
+## Available models
 
-## Running tests
+| Model         | Config file              |
+|---------------|--------------------------|
+| ConvMixer     | `configs/default.yaml`   |
+| Patch CNN     | `configs/patch_cnn.yaml` |
+| Vision Transformer | `configs/vit.yaml`  |
+| ResNet-18     | `configs/resnet18.yaml`  |
 
-```bash
-pytest
-```
+Switch models by changing `--config`.
 
-## Design notes
+## Outputs
 
-- All paths are resolved relative to the project root via `pathlib`.
-- Archive extraction is idempotent: it only runs if the extracted files are missing.
-- Random seeds are set deterministically for reproducibility.
-- PyTorch device selection is automatic: MPS → CUDA → CPU.
-- The training loop uses AMP, EMA, gradient clipping, and cosine LR with linear warmup.
-- Checkpoints save the best validation model and the last epoch.
-- ONNX export bakes normalization into the graph and runs an ONNX Runtime parity check.
-- No Google Drive dependency remains.
+- **Checkpoints**: `checkpoints/<model>_best.pt` and `checkpoints/<model>_last.pt`
+- **ONNX model**: `checkpoints/<model>.onnx` (if `--export-onnx` is used)
+- **Metrics log**: `checkpoints/<model>_metrics.jsonl`
+
+## Features included
+
+- Config-driven training via YAML files.
+- Multiple model architectures in one place.
+- Modern training recipe: AdamW, warmup + cosine LR, gradient clipping, AMP, EMA.
+- Data augmentation: RandAugment, CutMix, Mixup, RandomErasing.
+- Best checkpointing, early stopping, and training metrics logging.
+- Test-time augmentation during evaluation.
+- ONNX export with runtime parity check.
+- DDP-ready for multi-GPU training.
+
+## Notes
+
+- The project uses MPS if available (Apple Silicon), otherwise CUDA, then CPU.
+- For real training, use the full dataset and run for at least 50 epochs.
+- `fast_dev_run=true` is only for quick smoke tests.
