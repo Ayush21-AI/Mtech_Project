@@ -141,3 +141,7 @@ Switch models by changing `--config`.
 - The project uses MPS if available (Apple Silicon), otherwise CUDA, then CPU.
 - For real training, use the full dataset and run for at least 50 epochs.
 - `fast_dev_run=true` is only for quick smoke tests.
+
+## Repository
+
+GitHub: https://github.com/Ayush21-AI/ML_MTech_Project
