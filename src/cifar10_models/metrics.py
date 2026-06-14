@@ -73,17 +73,15 @@ def evaluate_loader(
     model.eval()
     tracker = MetricsTracker()
 
-    autocast = amp_manager.autocast if amp_manager is not None else torch.autocast(
-        device.type, enabled=False
-    ).__enter__
+    use_amp = amp_manager is not None and amp_manager.enabled
 
     with torch.no_grad():
         for inputs, targets in loader:
-            inputs = inputs.to(device, non_blocking=True)
-            targets = targets.to(device, non_blocking=True)
+            inputs = inputs.to(device)
+            targets = targets.to(device)
 
-            if amp_manager is not None:
-                with autocast():
+            if use_amp:
+                with amp_manager.autocast():
                     outputs = model(inputs)
                     loss = criterion(outputs, targets)
             else:

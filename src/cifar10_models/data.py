@@ -180,12 +180,16 @@ def get_dataloaders(
         seed=data_cfg.seed,
     )
 
+    # Disable CutMix/Mixup for tiny fast-dev subsets to keep smoke tests stable.
+    use_cutmix_mixup = (
+        augmentation_cfg.cutmix or augmentation_cfg.mixup
+    ) and not data_cfg.fast_dev_run
     cutmix_collator = CutMixMixupCollator(
         cutmix_alpha=augmentation_cfg.cutmix_alpha,
         mixup_alpha=augmentation_cfg.mixup_alpha,
         num_classes=num_classes,
-        cutmix=augmentation_cfg.cutmix,
-        mixup=augmentation_cfg.mixup,
+        cutmix=augmentation_cfg.cutmix and use_cutmix_mixup,
+        mixup=augmentation_cfg.mixup and use_cutmix_mixup,
     )
 
     train_loader = DataLoader(
@@ -194,7 +198,7 @@ def get_dataloaders(
         sampler=train_sampler,
         num_workers=data_cfg.num_workers,
         pin_memory=data_cfg.pin_memory and torch.device(get_device()).type != "cpu",
-        drop_last=True,
+        drop_last=not data_cfg.fast_dev_run,
         collate_fn=cutmix_collator,
     )
     val_loader = DataLoader(

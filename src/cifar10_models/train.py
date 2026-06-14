@@ -52,8 +52,8 @@ def _run_epoch(
     with torch.set_grad_enabled(is_training):
         pbar = tqdm(loader, desc=desc, leave=False)
         for step, (inputs, targets) in enumerate(pbar):
-            inputs = inputs.to(device, non_blocking=True)
-            targets = targets.to(device, non_blocking=True)
+            inputs = inputs.to(device)
+            targets = targets.to(device)
 
             if is_training:
                 optimizer.zero_grad(set_to_none=True)

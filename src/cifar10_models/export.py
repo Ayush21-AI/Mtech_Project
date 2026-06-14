@@ -16,6 +16,15 @@ from cifar10_models.augmentation import CIFAR_MEAN, CIFAR_STD
 logger = logging.getLogger("cifar10_models")
 
 
+def _sanitize_batchnorm(model: nn.Module) -> None:
+    """Reset BatchNorm running stats if they contain NaN values."""
+    for module in model.modules():
+        if isinstance(module, nn.BatchNorm2d):
+            if torch.isnan(module.running_mean).any() or torch.isnan(module.running_var).any():
+                logger.warning("BatchNorm running stats contain NaN; resetting for export.")
+                module.reset_running_stats()
+
+
 class NormalizeWrapper(nn.Module):
     """Wrap a model with baked-in CIFAR-10 normalization."""
 
@@ -62,8 +71,15 @@ def export_to_onnx(
     export_path = Path(export_path)
     export_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Sanitize BatchNorm running stats: tiny fast-dev runs or unstable
+    # training can leave NaN values, which break torch.export. Reset them
+    # before wrapping so the exported graph is clean.
+    _sanitize_batchnorm(model)
+
     wrapped = NormalizeWrapper(model)
     wrapped.eval()
+    # torch.export-based ONNX exporter is not device-agnostic on MPS; use CPU.
+    wrapped = wrapped.cpu()
 
     # Use a non-unity batch dummy input when dynamic batch is requested.
     # Some transformer patterns (class token expand + pos_embed broadcast)

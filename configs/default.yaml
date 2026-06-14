@@ -61,5 +61,5 @@ logging:
   use_wandb: false
 
 export:
-  opset_version: 17
+  opset_version: 18
   dynamic_batch: true

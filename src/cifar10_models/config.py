@@ -114,7 +114,7 @@ class LoggingConfig:
 class ExportConfig:
     """ONNX export settings."""
 
-    opset_version: int = 17
+    opset_version: int = 18
     dynamic_batch: bool = True
 
 
